@@ -13,10 +13,6 @@
     #define BANK3  (h'180')
     #define baudRate (d'250') ;baudrate = 10 (10 bps)
 			     ;set BRG16 bit of BAUDCON register
-    #define XTAL (d'4')	     ;4MHz crystal
-    ; Low Speed:
-    ;  baud rate = (XTAL * 10^6) / (64 * (X + 1)) - 1
-    #define X ((XTAL * d'1000000') / (d'64' * baudRate)) - 1
 
     __CONFIG _CONFIG1,    _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF & _WDTE_OFF & _PWRTE_ON & _FOSC_XT & _FCMEN_OFF & _IESO_OFF
 
@@ -26,13 +22,12 @@ userMillis	RES	1
 w_copy		RES     1	;variable used for context saving (work reg)
 status_copy	RES     1	;variable used for context saving (status reg)
 pclath_copy	RES     1	;variable used for context saving (pclath copy)
-positionSpeed	RES	1	;as well as thruster speed (Default max-reverse)
-				;0.9mS (CCPR1L = 59)
-adcCounter	RES	1	;counter to be increented till value in
+positionSpeed	RES	1	;Thruster speed (Default max-reverse)
+				;1.1mS (CCPR1L = 70)
+adcCounter	RES	1	;counter to be incremented till value in
 				;ADRESH is reached
 ADRESHc		RES	1	;copy of ADRESH
-compCounter	RES	1	;counter to be incremented once every 6 servo
-				;steps to give full range of motion
+compCounter	RES	1	
 motorTemp	RES	1
 ADRESH0		RES	1	;copy of value from pin AN0
 ADRESH1		RES	1	;copy of value from pin AN1
@@ -55,23 +50,23 @@ thrusterUpDown	RES	1	;PWM value for up/down thrusters
 
 ;**********************************************************************
     ORG		0x000	
-    pagesel		start	; processor reset vector
-    goto		start	; go to beginning of program
+    pagesel		start	        ;processor reset vector
+    goto		start	        ;go to beginning of program
 INT_VECTOR:
-    ORG		0x004		; interrupt vector location
+    ORG		0x004		        ;interrupt vector location
 INTERRUPT:
-	movwf   w_copy                      ; save off current W register contents
-        movf    STATUS,w                    ; move status register into W register
-        movwf   status_copy                 ; save off contents of STATUS register
-        movf    PCLATH,W
-        movwf   pclath_copy
+	movwf	    w_copy              ;save off current W register contents
+        movf	    STATUS,w            ;move status register into W register
+        movwf	    status_copy         ;save off contents of STATUS register
+        movf	    PCLATH,W
+        movwf	    pclath_copy
 	
-	banksel	PORTB
-	movfw	PORTB		;clear mismatch
+	banksel	    PORTB
+	movfw	    PORTB		;clear mismatch
 	
-	bcf	INTCON, IOCIF	;clear flag 
-	banksel	IOCBF
-	clrf	IOCBF
+	bcf	    INTCON, IOCIF	;clear flag 
+	banksel	    IOCBF
+	clrf	    IOCBF
 	
 ;stop motors
 	movlw	    .95
@@ -242,13 +237,13 @@ waitTmr0
 Delay16Us
     clrf	    dly16Ctr	;zero out delay counter
 begin
-    nop			;1 uS (4Mhz clock/4 = 1uS per instruction
+    nop			
     banksel	    dly16Ctr
     incf	    dly16Ctr, f
     movlw	    .16		
-    xorwf	    dly16Ctr, w	 ;16 uS passed?
+    xorwf	    dly16Ctr, w	 
     btfss	    STATUS, Z
-    goto	    begin	;no so keep looping
+    goto	    begin	
     retlw	    0
     
 ;Get the displacement of AN0 analog input (distance from 127)
@@ -316,36 +311,26 @@ sendThrust
     movfw	thruster1
     movwf	transData
     call	Transmit
-    ;movlw	.25
-    ;call	delayMillis
     
     banksel	thruster2
     movfw	thruster2
     movwf	transData
     call	Transmit
-    ;movlw	.25
-    ;call	delayMillis
     
     banksel	thruster3
     movfw	thruster3
     movwf	transData
     call	Transmit
-    ;movlw	.25
-    ;call	delayMillis
     
     banksel	thruster4
     movfw	thruster4
     movwf	transData
     call	Transmit
-    ;movlw	.25
-    ;call	delayMillis
     
     banksel	thrusterUpDown
     movfw	thrusterUpDown
     movwf	transData
     call	Transmit
-    ;movlw	.25
-    ;call	delayMillis
     
     movlw	.50
     call	delayMillis
