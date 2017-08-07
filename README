@@ -8,7 +8,7 @@ to control depth.
 
 The analog voltage of the joystick potentiometers are continuously sampled and converted to digital values 
 which will be placed in the CCPRXL registers of the receiving PIC16F1937.  The MCU and circuitry of the
-receiving device takes these values and sends an appropriate PWM value to the ESCs of each thruster.
+receiving device takes these values and sends a PWM signal of an appropriate pulse width to the ESCs of each thruster.
 
 The data is transmitted in 8-bit data packets via the PIC16F1937 UART module.
 
