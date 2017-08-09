@@ -13,6 +13,10 @@
     #define BANK3  (h'180')
     #define baudRate (d'250') ;baudrate = 10 (10 bps)
 			     ;set BRG16 bit of BAUDCON register
+    #define XTAL (d'4')	     ;4MHz crystal
+    ; Low Speed:
+    ;  baud rate = (XTAL * 10^6) / (64 * (X + 1)) - 1
+    #define X ((XTAL * d'1000000') / (d'64' * baudRate)) - 1
 
     __CONFIG _CONFIG1,    _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF & _WDTE_OFF & _PWRTE_ON & _FOSC_XT & _FCMEN_OFF & _IESO_OFF
 
@@ -22,18 +26,20 @@ userMillis	RES	1
 w_copy		RES     1	;variable used for context saving (work reg)
 status_copy	RES     1	;variable used for context saving (status reg)
 pclath_copy	RES     1	;variable used for context saving (pclath copy)
-positionSpeed	RES	1	;Thruster speed (Default max-reverse)
-				;1.1mS (CCPR1L = 70)
-adcCounter	RES	1	;counter to be incremented till value in
+adcCounter	RES	1	;counter to be increented till value in
 				;ADRESH is reached
 ADRESHc		RES	1	;copy of ADRESH
-compCounter	RES	1	
+compCounter	RES	1	;counter to be incremented once every 6 servo
+				;steps to give full range of motion
 motorTemp	RES	1
 ADRESH0		RES	1	;copy of value from pin AN0
 ADRESH1		RES	1	;copy of value from pin AN1
 ADRESH2		RES	1	;copy of value from pin AN2
 AN0disp		RES	1	;displacement of ADRESHO from 127
 AN1disp		RES	1	;displacement of ADRESH1 from 127
+positionSpeed	RES	1	;value returned from getMotorSpeed routine
+				;to be placed in forward, reverse and upDown speeds
+state		RES	1	;desired directional "state" of ROV
 
 ;General Variables
 GENVAR1	UDATA
@@ -41,41 +47,39 @@ transData	RES	1	;Data to be transmitted via UART
 receiveData	RES	1	;Data received via UART
 dly16Ctr	RES	1
 initCounter	RES	1	;used for calls to delayMillis to initialize ESC
-thruster1	RES	1	;PWM value for thruster #1
-thruster2	RES	1	;PWM value for thruster #2
-thruster3	RES	1	;PWM value for thruster #3
-thruster4	RES	1	;PWM value for thruster #4
-thrusterUpDown	RES	1	;PWM value for up/down thrusters
+forwardSpeed	RES	1	;Forward value for CCPR1L
+reverseSpeed	RES	1	;Reverse value for CCPR2L
+upDownSpeed	RES	1	;CCPR3L value for up/down thrusters
 
 
 ;**********************************************************************
     ORG		0x000	
-    pagesel		start	        ;processor reset vector
-    goto		start	        ;go to beginning of program
+    pagesel		start	; processor reset vector
+    goto		start	; go to beginning of program
 INT_VECTOR:
-    ORG		0x004		        ;interrupt vector location
+    ORG		0x004		; interrupt vector location
 INTERRUPT:
-	movwf	    w_copy              ;save off current W register contents
-        movf	    STATUS,w            ;move status register into W register
-        movwf	    status_copy         ;save off contents of STATUS register
-        movf	    PCLATH,W
-        movwf	    pclath_copy
+	movwf   w_copy                      ; save off current W register contents
+        movf    STATUS,w                    ; move status register into W register
+        movwf   status_copy                 ; save off contents of STATUS register
+        movf    PCLATH,W
+        movwf   pclath_copy
 	
-	banksel	    PORTB
-	movfw	    PORTB		;clear mismatch
+	banksel	PORTB
+	movfw	PORTB		;clear mismatch
 	
-	bcf	    INTCON, IOCIF	;clear flag 
-	banksel	    IOCBF
-	clrf	    IOCBF
+	bcf	INTCON, IOCIF	;clear flag 
+	banksel	IOCBF
+	clrf	IOCBF
 	
 ;stop motors
+	movlw	    .8		;"stop" state
+	movwf	    state
 	movlw	    .95
-	banksel	    thruster1
-	movwf	    thruster1
-	movwf	    thruster2
-	movwf	    thruster3
-	movwf	    thruster4
-	movwf	    thrusterUpDown
+	banksel	    forwardSpeed
+	movwf	    forwardSpeed
+	movwf	    reverseSpeed
+	movwf	    upDownSpeed
 	call	    sendThrust
 stickDirection    
 ;3) Check AN1 (Rotation Value) 
@@ -131,24 +135,21 @@ waitAdcDepth
     goto	depth		;ANO (depth) is greater
     
 rotate
-    ;stop depth thrusters:
-    movlw	.95		;1500uS pulse width
-    banksel	CCPR3L		
-    movwf	CCPR3L
     ;Determine whether we need to rotate CCW or CW:
     ;(ADRESH1 > 127 = right********ADRESH1 <= 127 = left)
     btfss	ADRESH1, 7	;test MSB of ADRESH1 (1: > 127, 0: <= 127)
     goto	CCW
     
 CW ;(Clockwise rotation):
+    movlw	.5		;"clockwise-rotation" state
+    movwf	state
     ;Forward PWM (normal value) to thrusters 1 and 4 (top-left and bottom-right thrusters)
     movfw	ADRESH1		;send normal PWM value from ADC conversion
     movwf	ADRESHc		;to thrusters 1 and 4 via the forward logic
     call	getMotorSpeed	;IC and through P1A
     movfw	positionSpeed
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster4
+    banksel	forwardSpeed
+    movwf	forwardSpeed
     ;Reverse PWM (calculated value) to thrusters 2 and 3 (top-right and bottom-left thrusters)
     ;get displacement of ADRESH1 (already calculated above)
     movlw	.128		;128 instead of 127 to prevent overflow
@@ -157,20 +158,21 @@ CW ;(Clockwise rotation):
     subwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a reverse PWM value and output it to the
     movfw	positionSpeed	;reverse logic IC via P2A
-    banksel	thruster2
-    movwf	thruster2
-    movwf	thruster3
+    banksel	reverseSpeed
+    movwf	reverseSpeed
+    ;call	sendThrust
     goto	isrEnd
     
 CCW ;(Counter-clockwise rotation):
+    movlw	.6		;"counterclockwise-rotation" state
+    movwf	state
     ;Reverse PWM (normal value) to thrusters 1 and 4 (top-left and bottom-right thrusters)
     movfw	ADRESH1
     movwf	ADRESHc
     call	getMotorSpeed
     movfw	positionSpeed
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster4
+    banksel	reverseSpeed
+    movwf	reverseSpeed
     ;Forward PWM (calculated value) to thrusters 2 and 3 (top-right and bottom-left thrusters)
     ;get displacement of ADRESH1 (already calculated above)
     movlw	.127		
@@ -179,19 +181,21 @@ CCW ;(Counter-clockwise rotation):
     addwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a forward PWM value and output it to the
     movfw	positionSpeed	;forward logic IC via P1A
-    banksel	thruster2
-    movwf	thruster2
-    movwf	thruster3
+    banksel	forwardSpeed
+    movwf	forwardSpeed
+    ;call	sendThrust
     goto	isrEnd
 	
 depth
+    movlw	.7		;"up/down" state
+    movwf	state
 ;use value from AN0 to get speed for dive/surface thrusters:
     movfw	ADRESH0
     movwf	ADRESHc
     call	getMotorSpeed
     movfw	positionSpeed
-    banksel	thrusterUpDown
-    movwf	thrusterUpDown
+    banksel	upDownSpeed
+    movwf	upDownSpeed
     
 ;restore pre-ISR values to registers
 isrEnd
@@ -202,22 +206,22 @@ isrEnd
     goto	stickDirection
     
 ;stop motors
+    movlw	.8		;"stop" state
+    movwf	state
     movlw	.95
-    banksel	thruster1
-    movwf	    thruster1
-    movwf	    thruster2
-    movwf	    thruster3
-    movwf	    thruster4
-    movwf	    thrusterUpDown
-    call	    sendThrust
+    banksel	forwardSpeed
+    movwf	forwardSpeed
+    movwf	reverseSpeed
+    movwf	upDownSpeed
+    call	sendThrust
 	
-	movf	pclath_copy,W
-	movwf	PCLATH
-	movf	status_copy,w   ;retrieve copy of STATUS register
-	movwf	STATUS          ;restore pre-isr STATUS register contents
-	swapf	w_copy,f
-	swapf	w_copy,w
-	retfie
+    movf	pclath_copy,W
+    movwf	PCLATH
+    movf	status_copy,w   ;retrieve copy of STATUS register
+    movwf	STATUS          ;restore pre-isr STATUS register contents
+    swapf	w_copy,f
+    swapf	w_copy,w
+    retfie
     
 delayMillis
     movwf	userMillis	;user defined number of milliseconds
@@ -237,13 +241,13 @@ waitTmr0
 Delay16Us
     clrf	    dly16Ctr	;zero out delay counter
 begin
-    nop			
+    nop			;1 uS (4Mhz clock/4 = 1uS per instruction
     banksel	    dly16Ctr
     incf	    dly16Ctr, f
     movlw	    .16		
-    xorwf	    dly16Ctr, w	 
+    xorwf	    dly16Ctr, w	 ;16 uS passed?
     btfss	    STATUS, Z
-    goto	    begin	
+    goto	    begin	;no so keep looping
     retlw	    0
     
 ;Get the displacement of AN0 analog input (distance from 127)
@@ -307,28 +311,22 @@ motorEnd
     
 ;Send thruster data
 sendThrust
-    banksel	thruster1
-    movfw	thruster1
+    movfw	state
     movwf	transData
     call	Transmit
     
-    banksel	thruster2
-    movfw	thruster2
+    banksel	forwardSpeed
+    movfw	forwardSpeed
     movwf	transData
     call	Transmit
     
-    banksel	thruster3
-    movfw	thruster3
+    banksel	reverseSpeed
+    movfw	reverseSpeed
     movwf	transData
     call	Transmit
     
-    banksel	thruster4
-    movfw	thruster4
-    movwf	transData
-    call	Transmit
-    
-    banksel	thrusterUpDown
-    movfw	thrusterUpDown
+    banksel	upDownSpeed
+    movfw	upDownSpeed
     movwf	transData
     call	Transmit
     
@@ -467,12 +465,10 @@ start:
     movlw	.250
     call	delayMillis
     movlw	.95
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster2
-    movwf	thruster3
-    movwf	thruster4
-    movwf	thrusterUpDown
+    banksel	forwardSpeed
+    movwf	forwardSpeed
+    movwf	reverseSpeed
+    movwf	upDownSpeed
     
     ;5 second delay
     clrf	motorTemp
@@ -566,13 +562,13 @@ checkLRslop
     btfss	STATUS, C	;(C=0 is neg #)
     goto	Displacement	;value < 126 (go to rotation section)
     ;Stop all thrusters (neutral joystick position)
+    movlw	.8		;"stop" state
+    movwf	state
     movlw	.95		;1500uS pulse width
-    banksel	thruster1		
-    movwf	thruster1
-    movwf	thruster2
-    movwf	thruster3
-    movwf	thruster4
-    movwf	thrusterUpDown
+    banksel	forwardSpeed		
+    movwf	forwardSpeed
+    movwf	reverseSpeed
+    movwf	upDownSpeed
     
     goto	mainLoop
     
@@ -599,14 +595,15 @@ fwdRev
     goto	reverse
     
 forward
+    movlw	.1		;"forward" state
+    movwf	state
     ;Forward PWM (normal value) to thrusters 1 and 2 (top-left and top-right thrusters)
     movfw	ADRESH0
     movwf	ADRESHc
     call	getMotorSpeed
     movfw	positionSpeed
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster2
+    banksel	forwardSpeed
+    movwf	forwardSpeed
     ;Reverse PWM (calculated value) to thrusters 3 and 4 (bottom left/bottom right thrusters)
     ;get displacement of ADRESH0 (already calculated above)
     movlw	.128		;128 instead of 127 to prevent overflow
@@ -615,20 +612,20 @@ forward
     subwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a reverse PWM value and output it to the
     movfw	positionSpeed	;reverse logic IC via P2A
-    banksel	thruster3
-    movwf	thruster3
-    movwf	thruster4
+    banksel	reverseSpeed
+    movwf	reverseSpeed
     goto        mainLoop
     
 reverse
+    movlw	.2		;"reverse" state
+    movwf	state
     ;Reverse PWM (normal value) to thrusters 1/2 (top-left and top-right thrusters)
     movfw	ADRESH0
     movwf	ADRESHc
     call	getMotorSpeed
     movfw	positionSpeed
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster2
+    banksel	reverseSpeed
+    movwf	reverseSpeed
     ;Forward PWM (calculated value) to thrusters 3/4 (bottom-right and bottom-left thrusters)
     ;get displacement of ADRESH0 (already calculated above)
     movlw	.127		
@@ -637,9 +634,8 @@ reverse
     addwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a forward PWM value and output it to the
     movfw	positionSpeed	;forward logic IC via P1A
-    banksel	thruster3
-    movwf	thruster3
-    movwf	thruster4
+    banksel	forwardSpeed
+    movwf	forwardSpeed
     goto	mainLoop
     
 leftRight
@@ -649,14 +645,15 @@ leftRight
     goto	traverseLeft
     
 traverseRight
+    movlw	.3		;"traverse right" state
+    movwf	state
     ;Forward PWM (normal value) to thrusters 1 and 3 (top-left and bottom-left thrusters)
     movfw	ADRESH1		;send normal PWM value from ADC conversion
     movwf	ADRESHc		;to thrusters 1 and 4 via the forward logic
     call	getMotorSpeed	;IC and through P1A
     movfw	positionSpeed
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster3
+    banksel	forwardSpeed
+    movwf	forwardSpeed
     ;Reverse PWM (calculated value) to thrusters 2 and 4 (top-right and bottom-right thrusters)
     ;get displacement of ADRESH1 (already calculated above)
     movlw	.128		;128 instead of 127 to prevent overflow
@@ -665,20 +662,20 @@ traverseRight
     subwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a reverse PWM value and output it to the
     movfw	positionSpeed	;reverse logic IC via P2A
-    banksel	thruster2
-    movwf	thruster2
-    movwf	thruster4
+    banksel	reverseSpeed
+    movwf	reverseSpeed
     goto	mainLoop
     
 traverseLeft
+    movlw	.4		;"traverse left" state
+    movwf	state
     ;Reverse PWM (normal value) to thrusters 1 and 3 (top-left and bottom-left thrusters)
     movfw	ADRESH1
     movwf	ADRESHc
     call	getMotorSpeed
     movfw	positionSpeed
-    banksel	thruster1
-    movwf	thruster1
-    movwf	thruster3
+    banksel	reverseSpeed
+    movwf	reverseSpeed
     ;Forward PWM (calculated value) to thrusters 2 and 4 (top-right and bottom-right thrusters)
     ;get displacement of ADRESH1 (already calculated above)
     movlw	.127		
@@ -687,9 +684,8 @@ traverseLeft
     addwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a forward PWM value and output it to the
     movfw	positionSpeed	;forward logic IC via P1A
-    banksel	thruster2
-    movwf	thruster2
-    movwf	thruster4
+    banksel	forwardSpeed
+    movwf	forwardSpeed
     
     goto	mainLoop
    
