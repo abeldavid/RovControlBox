@@ -11,12 +11,6 @@
     #define BANK1  (h'080')
     #define BANK2  (h'100')
     #define BANK3  (h'180')
-    #define baudRate (d'250') ;baudrate = 10 (10 bps)
-			     ;set BRG16 bit of BAUDCON register
-    #define XTAL (d'4')	     ;4MHz crystal
-    ; Low Speed:
-    ;  baud rate = (XTAL * 10^6) / (64 * (X + 1)) - 1
-    #define X ((XTAL * d'1000000') / (d'64' * baudRate)) - 1
 
     __CONFIG _CONFIG1,    _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF & _WDTE_OFF & _PWRTE_ON & _FOSC_XT & _FCMEN_OFF & _IESO_OFF
 
@@ -46,7 +40,6 @@ GENVAR1	UDATA
 transData	RES	1	;Data to be transmitted via UART
 receiveData	RES	1	;Data received via UART
 dly16Ctr	RES	1
-initCounter	RES	1	;used for calls to delayMillis to initialize ESC
 forwardSpeed	RES	1	;Forward value for CCPR1L
 reverseSpeed	RES	1	;Reverse value for CCPR2L
 upDownSpeed	RES	1	;CCPR3L value for up/down thrusters
@@ -85,7 +78,7 @@ stickDirection
 ;3) Check AN1 (Rotation Value) 
     ;Set AN1 as analog input for AD conversion and start AD conversion
     movlw	b'00000101'
-		; -00000--  CHS<0:4> (bits 2-6) = 00001 = pin AN1/PORTA, 1 as analog input
+		; -00001--  CHS<0:4> (bits 2-6) = 00001 = pin AN1/PORTA, 1 as analog input
 		; ------0-  stop AD conversion
 		; -------1  Enable ADC
     banksel	ADCON0
@@ -124,7 +117,7 @@ waitAdcDepth
     
 ;5) Get AN1 displacement from 127     
     call	getAn1Disp
-;6) Get ANo displacement from 127
+;6) Get AN0 displacement from 127
     call	getAn0Disp
     
 ;subtract AN1disp from AN0disp to see which displacement is greater
@@ -136,7 +129,7 @@ waitAdcDepth
     
 rotate
     ;Determine whether we need to rotate CCW or CW:
-    ;(ADRESH1 > 127 = right********ADRESH1 <= 127 = left)
+    ;(if ADRESH1 > 127 then right, if ADRESH1 <= 127 then left)
     btfss	ADRESH1, 7	;test MSB of ADRESH1 (1: > 127, 0: <= 127)
     goto	CCW
     
@@ -146,7 +139,7 @@ CW ;(Clockwise rotation):
     ;Forward PWM (normal value) to thrusters 1 and 4 (top-left and bottom-right thrusters)
     movfw	ADRESH1		;send normal PWM value from ADC conversion
     movwf	ADRESHc		;to thrusters 1 and 4 via the forward logic
-    call	getMotorSpeed	;IC and through P1A
+    call	getMotorSpeed	;IC and through P1A of receiving device
     movfw	positionSpeed
     banksel	forwardSpeed
     movwf	forwardSpeed
@@ -157,10 +150,9 @@ CW ;(Clockwise rotation):
     movfw	AN1disp
     subwf	ADRESHc, f	;and subtract displacement from 128 
     call	getMotorSpeed	;to get a reverse PWM value and output it to the
-    movfw	positionSpeed	;reverse logic IC via P2A
+    movfw	positionSpeed	;reverse logic IC via P2A of receiving device
     banksel	reverseSpeed
     movwf	reverseSpeed
-    ;call	sendThrust
     goto	isrEnd
     
 CCW ;(Counter-clockwise rotation):
@@ -183,7 +175,6 @@ CCW ;(Counter-clockwise rotation):
     movfw	positionSpeed	;forward logic IC via P1A
     banksel	forwardSpeed
     movwf	forwardSpeed
-    ;call	sendThrust
     goto	isrEnd
 	
 depth
@@ -314,16 +305,22 @@ sendThrust
     movfw	state
     movwf	transData
     call	Transmit
+    movlw	.20
+    call	delayMillis
     
     banksel	forwardSpeed
     movfw	forwardSpeed
     movwf	transData
     call	Transmit
+    movlw	.20
+    call	delayMillis
     
     banksel	reverseSpeed
     movfw	reverseSpeed
     movwf	transData
     call	Transmit
+    movlw	.20
+    call	delayMillis
     
     banksel	upDownSpeed
     movfw	upDownSpeed
@@ -690,6 +687,7 @@ traverseLeft
     goto	mainLoop
    
     END                       
+
 
 
 
