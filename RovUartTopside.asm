@@ -115,6 +115,37 @@ waitAdcDepth
     movfw	ADRESH
     movwf	ADRESH0
     
+checkFRslopInt
+    movlw	.160
+    subwf	ADRESH0, w
+    btfsc	STATUS, C	;(C=0 is neg #)
+    goto	DispInt	;value > 160 (go to rotation section)
+    ;not greater than 160, check if less than 100
+    movlw	.90
+    subwf	ADRESH0, w
+    btfss	STATUS, C	;(C=0 is neg #)
+    goto	DispInt	;value < 126 (go to rotation section)
+checkLRslopInt
+    movlw	.160
+    subwf	ADRESH1, w
+    btfsc	STATUS, C	;(C=0 is neg #)
+    goto	DispInt	;value > 128 (go to rotation section)
+    ;not greater than 128, check if less than 126
+    movlw	.90
+    subwf	ADRESH1, w
+    btfss	STATUS, C	;(C=0 is neg #)
+    goto	DispInt	;value < 126 (go to rotation section)
+    ;Stop all thrusters (neutral joystick position)
+    movlw	.8		;"stop" state
+    movwf	state
+    movlw	.95		;1500uS pulse width
+    banksel	forwardSpeed		
+    movwf	forwardSpeed
+    movwf	reverseSpeed
+    movwf	upDownSpeed
+    goto	isrEnd
+
+DispInt
 ;5) Get AN1 displacement from 127     
     call	getAn1Disp
 ;6) Get AN0 displacement from 127
@@ -305,22 +336,22 @@ sendThrust
     movfw	state
     movwf	transData
     call	Transmit
-    ;movlw	.20
-    ;call	delayMillis
+    movlw	.5
+    call	delayMillis
     
     banksel	forwardSpeed
     movfw	forwardSpeed
     movwf	transData
     call	Transmit
-    ;movlw	.20
-    ;call	delayMillis
+    movlw	.5
+    call	delayMillis
     
     banksel	reverseSpeed
     movfw	reverseSpeed
     movwf	transData
     call	Transmit
-    ;movlw	.20
-    ;call	delayMillis
+    movlw	.5
+    call	delayMillis
     
     banksel	upDownSpeed
     movfw	upDownSpeed
