@@ -305,22 +305,22 @@ sendThrust
     movfw	state
     movwf	transData
     call	Transmit
-    movlw	.20
-    call	delayMillis
+    ;movlw	.20
+    ;call	delayMillis
     
     banksel	forwardSpeed
     movfw	forwardSpeed
     movwf	transData
     call	Transmit
-    movlw	.20
-    call	delayMillis
+    ;movlw	.20
+    ;call	delayMillis
     
     banksel	reverseSpeed
     movfw	reverseSpeed
     movwf	transData
     call	Transmit
-    movlw	.20
-    call	delayMillis
+    ;movlw	.20
+    ;call	delayMillis
     
     banksel	upDownSpeed
     movfw	upDownSpeed
@@ -414,6 +414,24 @@ start:
     banksel	OSCCON
     movwf	OSCCON
     
+    ;5 second delay
+    clrf	motorTemp
+delayStart
+    movlw	.250
+    call	delayMillis
+    movlw	.250
+    call	delayMillis
+    movlw	.250
+    call	delayMillis
+    movlw	.250
+    call	delayMillis
+    incf	motorTemp, f
+    movlw	.5
+    xorwf	motorTemp, w
+    btfss	STATUS, Z
+    goto	delayStart
+done5sDelay
+    
 ;CONFIGURE UART:
     ;Configure Baud rate
     movlw	b'01000000' 
@@ -466,25 +484,6 @@ start:
     movwf	forwardSpeed
     movwf	reverseSpeed
     movwf	upDownSpeed
-    
-    ;5 second delay
-    clrf	motorTemp
-delayStart
-    movlw	.250
-    call	delayMillis
-    movlw	.250
-    call	delayMillis
-    movlw	.250
-    call	delayMillis
-    movlw	.250
-    call	delayMillis
-    incf	motorTemp, f
-    movlw	.5
-    xorwf	motorTemp, w
-    btfss	STATUS, Z
-    goto	delayStart
-done5sDelay
-    
     
     movlw	.250
     movwf	motorTemp
