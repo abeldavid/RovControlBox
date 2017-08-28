@@ -165,7 +165,7 @@ rotate
     goto	CCW
     
 CW ;(Clockwise rotation):
-    movlw	.5		;"clockwise-rotation" state
+    movlw	.4		;"clockwise-rotation" state
     movwf	state
     ;Forward PWM (normal value) to thrusters 1 and 4 (top-left and bottom-right thrusters)
     movfw	ADRESH1		;send normal PWM value from ADC conversion
@@ -187,7 +187,7 @@ CW ;(Clockwise rotation):
     goto	isrEnd
     
 CCW ;(Counter-clockwise rotation):
-    movlw	.6		;"counterclockwise-rotation" state
+    movlw	.5		;"counterclockwise-rotation" state
     movwf	state
     ;Reverse PWM (normal value) to thrusters 1 and 4 (top-left and bottom-right thrusters)
     movfw	ADRESH1
@@ -209,7 +209,7 @@ CCW ;(Counter-clockwise rotation):
     goto	isrEnd
 	
 depth
-    movlw	.7		;"up/down" state
+    movlw	.6		;"up/down" state
     movwf	state
 ;use value from AN0 to get speed for dive/surface thrusters:
     movfw	ADRESH0
@@ -228,7 +228,7 @@ isrEnd
     goto	stickDirection
     
 ;stop motors
-    movlw	.8		;"stop" state
+    movlw	.7		;"stop" state
     movwf	state
     movlw	.95
     banksel	forwardSpeed
@@ -589,7 +589,7 @@ checkLRslop
     btfss	STATUS, C	;(C=0 is neg #)
     goto	Displacement	;value < 126 (go to rotation section)
     ;Stop all thrusters (neutral joystick position)
-    movlw	.8		;"stop" state
+    movlw	.7		;"stop" state
     movwf	state
     movlw	.95		;1500uS pulse width
     banksel	forwardSpeed		
@@ -622,7 +622,7 @@ fwdRev
     goto	reverse
     
 forward
-    movlw	.1		;"forward" state
+    movlw	.0		;"forward" state
     movwf	state
     ;Forward PWM (normal value) to thrusters 1 and 2 (top-left and top-right thrusters)
     movfw	ADRESH0
@@ -644,7 +644,7 @@ forward
     goto        mainLoop
     
 reverse
-    movlw	.2		;"reverse" state
+    movlw	.1		;"reverse" state
     movwf	state
     ;Reverse PWM (normal value) to thrusters 1/2 (top-left and top-right thrusters)
     movfw	ADRESH0
@@ -672,7 +672,7 @@ leftRight
     goto	traverseLeft
     
 traverseRight
-    movlw	.3		;"traverse right" state
+    movlw	.2		;"traverse right" state
     movwf	state
     ;Forward PWM (normal value) to thrusters 1 and 3 (top-left and bottom-left thrusters)
     movfw	ADRESH1		;send normal PWM value from ADC conversion
@@ -694,7 +694,7 @@ traverseRight
     goto	mainLoop
     
 traverseLeft
-    movlw	.4		;"traverse left" state
+    movlw	.3		;"traverse left" state
     movwf	state
     ;Reverse PWM (normal value) to thrusters 1 and 3 (top-left and bottom-left thrusters)
     movfw	ADRESH1
@@ -717,6 +717,9 @@ traverseLeft
     goto	mainLoop
    
     END                       
+
+
+
 
 
 
