@@ -66,7 +66,7 @@ INTERRUPT:
 	clrf	IOCBF
 	
 ;stop motors
-	movlw	    .8		;"stop" state
+	movlw	    .7		;"stop" state
 	movwf	    state
 	movlw	    .95
 	banksel	    forwardSpeed
@@ -136,7 +136,7 @@ checkLRslopInt
     btfss	STATUS, C	;(C=0 is neg #)
     goto	DispInt	;value < 126 (go to rotation section)
     ;Stop all thrusters (neutral joystick position)
-    movlw	.8		;"stop" state
+    movlw	.7		;"stop" state
     movwf	state
     movlw	.95		;1500uS pulse width
     banksel	forwardSpeed		
@@ -445,29 +445,13 @@ start:
     banksel	OSCCON
     movwf	OSCCON
     
-    ;5 second delay
     clrf	motorTemp
-delayStart
-    movlw	.250
-    call	delayMillis
-    movlw	.250
-    call	delayMillis
-    movlw	.250
-    call	delayMillis
-    movlw	.250
-    call	delayMillis
-    incf	motorTemp, f
-    movlw	.5
-    xorwf	motorTemp, w
-    btfss	STATUS, Z
-    goto	delayStart
-done5sDelay
     
 ;CONFIGURE UART:
     ;Configure Baud rate
     movlw	b'01000000' 
     banksel	SPBRG
-    movwf	SPBRG	    ;Move 'X' to baurate generator
+    movwf	SPBRG	    
     
     movlw	b'00000011'
     banksel	SPBRGH
