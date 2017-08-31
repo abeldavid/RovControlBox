@@ -50,30 +50,48 @@ upDownSpeed	RES	1	;CCPR3L value for up/down thrusters
     pagesel		start	; processor reset vector
     goto		start	; go to beginning of program
 INT_VECTOR:
-    ORG		0x004		; interrupt vector location
+    ORG		0x004		 ;interrupt vector location
 INTERRUPT:
-	movwf   w_copy                      ; save off current W register contents
-        movf    STATUS,w                    ; move status register into W register
-        movwf   status_copy                 ; save off contents of STATUS register
-        movf    PCLATH,W
-        movwf   pclath_copy
+    movwf       w_copy           ;save off current W register contents
+    movf        STATUS,w         ;move status register into W register
+    movwf       status_copy      ;save off contents of STATUS register
+    movf        PCLATH,W
+    movwf       pclath_copy
+    banksel	PIE1
+    bcf	PIE1,   RCIE	          ;disable UART receive interrupts
 	
-	banksel	PORTB
-	movfw	PORTB		;clear mismatch
+    ;Determine source of interrupt
+    banksel	PIR1
+    btfss	PIR1, RCIF	 ;UART receive interrupt?
+    goto	motors
 	
-	bcf	INTCON, IOCIF	;clear flag 
-	banksel	IOCBF
-	clrf	IOCBF
+UartReceive
+    call	Receive
+    ;determine sensor type
+    banksel	receiveData
+    movlw	.1		;code for leak
+    xorwf	receiveData, w
+    btfss	STATUS, Z
+    goto	isrEnd
+    call	Leak
+    goto	isrEnd
+motors    
+    banksel	PORTB
+    movfw	PORTB		;clear mismatch
+	
+    bcf	        INTCON, IOCIF	;clear flag 
+    banksel	IOCBF
+    clrf	IOCBF
 	
 ;stop motors
-	movlw	    .7		;"stop" state
-	movwf	    state
-	movlw	    .95
-	banksel	    forwardSpeed
-	movwf	    forwardSpeed
-	movwf	    reverseSpeed
-	movwf	    upDownSpeed
-	call	    sendThrust
+    movlw	.7		;"stop" state
+    movwf	state
+    movlw	.95
+    banksel	forwardSpeed
+    movwf	forwardSpeed
+    movwf	reverseSpeed
+    movwf	upDownSpeed
+    call	sendThrust
 stickDirection    
 ;3) Check AN1 (Rotation Value) 
     ;Set AN1 as analog input for AD conversion and start AD conversion
@@ -143,7 +161,7 @@ checkLRslopInt
     movwf	forwardSpeed
     movwf	reverseSpeed
     movwf	upDownSpeed
-    goto	isrEnd
+    goto	endMotors
 
 DispInt
 ;5) Get AN1 displacement from 127     
@@ -184,7 +202,7 @@ CW ;(Clockwise rotation):
     movfw	positionSpeed	;reverse logic IC via P2A of receiving device
     banksel	reverseSpeed
     movwf	reverseSpeed
-    goto	isrEnd
+    goto	endMotors
     
 CCW ;(Counter-clockwise rotation):
     movlw	.5		;"counterclockwise-rotation" state
@@ -206,7 +224,7 @@ CCW ;(Counter-clockwise rotation):
     movfw	positionSpeed	;forward logic IC via P1A
     banksel	forwardSpeed
     movwf	forwardSpeed
-    goto	isrEnd
+    goto	endMotors
 	
 depth
     movlw	.6		;"up/down" state
@@ -220,7 +238,7 @@ depth
     movwf	upDownSpeed
     
 ;restore pre-ISR values to registers
-isrEnd
+endMotors
     call	sendThrust
 ;test if button is still pressed:
     banksel	PORTB
@@ -236,7 +254,7 @@ isrEnd
     movwf	reverseSpeed
     movwf	upDownSpeed
     call	sendThrust
-	
+isrEnd	
     movf	pclath_copy,W
     movwf	PCLATH
     movf	status_copy,w   ;retrieve copy of STATUS register
@@ -244,6 +262,11 @@ isrEnd
     swapf	w_copy,f
     swapf	w_copy,w
     retfie
+;****************************Leak Indicator*************************************
+Leak
+    banksel	PORTD
+    bsf		PORTD, 1
+    retlw	0
     
 delayMillis
     movwf	userMillis	;user defined number of milliseconds
@@ -378,6 +401,23 @@ wait_trans
     goto	wait_trans
     retlw	0
     
+Receive
+    banksel	PIR1
+wait_receive
+    btfss	PIR1, RCIF	;Is RX buffer full? (1=full, 0=notfull)
+    goto	wait_receive	;wait until it is full
+    banksel	RCSTA
+    bcf		RCSTA, CREN
+    banksel	RCREG
+    movfw	RCREG		;Place data from RCREG into "receiveData"
+    banksel	receiveData
+    movwf	receiveData
+    banksel	PIR1
+    bcf	        PIR1, RCIF	    ;clear UART receive interrupt flag
+    banksel	RCSTA
+    bsf		RCSTA, CREN
+    retlw	0
+    
 ;*************************END UART SUBROUTINES**********************************
 	
 start:
@@ -389,7 +429,7 @@ start:
     movwf   (TRISB ^ BANK1)
     movlw   b'11111111'		;PORTC, 7 = RX pin for UART         
     movwf   (TRISC ^ BANK1)
-    movlw   b'11111111'
+    movlw   b'11111101'
     movwf   (TRISD ^ BANK1)	    
     movlw   b'00000000'
     movwf   (TRISE ^ BANK1)
@@ -421,7 +461,7 @@ start:
 		 ;----1---	;Enable interrupt on change for PORTB (IOCIE=0)
     movwf	INTCON
     
-    ;Enable interrupt on change for PORTB, 0
+    ;Enable interrupt on change for PORTB
     movlw	b'00000001'	;PORTB,  pin set for IOC (rising edge)
     banksel	IOCBP
     movwf	IOCBP
@@ -486,10 +526,18 @@ start:
     banksel	transData
     clrf	transData
     
+    movlw	b'00100000'
+		 ;--1-----	;Enable USART receive interrupt (RCIE=1)
+    banksel	PIE1
+    movwf	PIE1
+    
     banksel	ANSELB
     clrf	ANSELB
     clrf	ANSELD
     clrf	ANSELE
+    
+    banksel	PORTD
+    clrf	PORTD
     
     ;1/4 second delay
     movlw	.250
