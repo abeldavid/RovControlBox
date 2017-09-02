@@ -57,8 +57,6 @@ INTERRUPT:
     movwf       status_copy      ;save off contents of STATUS register
     movf        PCLATH,W
     movwf       pclath_copy
-    banksel	PIE1
-    bcf	PIE1,   RCIE	          ;disable UART receive interrupts
 	
     ;Determine source of interrupt
     banksel	PIR1
@@ -72,7 +70,19 @@ UartReceive
     movlw	.1		;code for leak
     xorwf	receiveData, w
     btfss	STATUS, Z
+    goto	testsubReady
+    goto	LeakDetected
+testsubReady
+    movlw	.2		;code for ready light upon ESC initialization
+    banksel	receiveData
+    xorwf	receiveData, w
+    btfss	STATUS, Z
     goto	isrEnd
+    call	ESCready
+    goto	isrEnd
+LeakDetected
+    banksel	PIE1
+    bcf	        PIE1, RCIE	 ;disable UART receive interrupts
     call	Leak
     goto	isrEnd
 motors    
@@ -255,6 +265,8 @@ endMotors
     movwf	upDownSpeed
     call	sendThrust
 isrEnd	
+    banksel	PIE1
+    bsf	        PIE1, RCIE	 ;enable UART receive interrupts
     movf	pclath_copy,W
     movwf	PCLATH
     movf	status_copy,w   ;retrieve copy of STATUS register
@@ -266,6 +278,16 @@ isrEnd
 Leak
     banksel	PORTD
     bsf		PORTD, 1
+    movlw       .25              
+    banksel	CCPR1L
+    movwf       CCPR1L          ; -> PWM duty cycle = 18%
+    retlw	0
+    ;***************************End Leak Indicator******************************
+    
+    ;***************************ESC ready light*********************************
+ESCready
+    banksel	PORTD
+    bsf		PORTD, 0
     retlw	0
     
 delayMillis
@@ -422,19 +444,19 @@ wait_receive
 	
 start:
     banksel BANK1
-    ;Set PORTS to output
+    ;************************Configure PORTS************************************
     movlw   b'00000011'		
     movwf   (TRISA ^ BANK1)
     movlw   b'11111111'		    
     movwf   (TRISB ^ BANK1)
-    movlw   b'11111111'		;PORTC, 7 = RX pin for UART         
+    movlw   b'11111011'		;PORTC, 7 = RX pin for UART, PORTC, 2=P1A (PWM)         
     movwf   (TRISC ^ BANK1)
-    movlw   b'11111101'
+    movlw   b'11111100'		;Leak and ready lights
     movwf   (TRISD ^ BANK1)	    
     movlw   b'00000000'
     movwf   (TRISE ^ BANK1)
     
-    ;Configure timer
+    ;************************Configure timer************************************
     ;With 4Mhz external crystal, FOSC is not divided by 4.
     ;Therefore each instruction is 1/4 of a microsecond (250*10^-9 sec.)
     movlw	b'11000100'	
@@ -452,7 +474,7 @@ start:
     banksel	OPTION_REG	
     movwf	OPTION_REG	
 	
-    ;enable interrupts
+    ;*************************Enable interrupts*********************************
     movlw	b'11001000'
 	         ;1-------	;Enable global interrupts (GIE=1)
 		 ;-1------	;Enable peripheral interrupts (PEIE=1)
@@ -466,7 +488,7 @@ start:
     banksel	IOCBP
     movwf	IOCBP
     
-    ;Config ADC:
+    ;************************Config ADC:****************************************
     movlw	b'00000011'
     banksel	ANSELA
     movwf	ANSELA
@@ -480,6 +502,30 @@ start:
     banksel	ADCON1
     movwf	ADCON1
     
+    ;***********************Configure PWM***************************************
+    movlw       b'00000110'     ; configure Timer2:
+                ; -----1--          turn Timer2 on (TMR2ON = 1)
+                ; ------10          prescale = 16 (T2CKPS = 10)
+    banksel     T2CON           ; -> TMR2 increments every 4 us
+    movwf       T2CON
+    movlw       .140            ; PR2 = 140
+    banksel     PR2             ; -> period = 560uS
+    movwf       PR2             ; -> PWM frequency = 1.8 kHz
+    ;Configure CCP1, CCP2 and CCP3 to be based off of TMR2:
+    banksel     CCPTMRS0
+    movlw	b'11111100'
+		 ;------00	;CCP1 based off of TMR2
+    ;configure CCP1
+    movlw       b'00001100'     ; configure CCP:
+                ; 00------          single output (P1M = 00 -> CCP1 active)
+                ; --00----          DC1B = 00 -> LSBs of PWM duty cycle = 00
+                ; ----1100          PWM mode: all active-high (CCP1M = 1100)
+    banksel     CCP1CON         ; -> single output (CCP1) mode, active-high
+    movwf       CCP1CON
+    banksel	CCPR1L
+    clrf	CCPR1L
+    ;***************************************************************************
+    
     ;4Mhz external crystal:
     movlw	b'00000000'
     banksel	OSCCON
@@ -487,7 +533,7 @@ start:
     
     clrf	motorTemp
     
-;CONFIGURE UART:
+;*********************************CONFIGURE UART********************************
     ;Configure Baud rate
     movlw	b'01000000' 
     banksel	SPBRG
@@ -525,7 +571,7 @@ start:
     call	delayMillis
     banksel	transData
     clrf	transData
-    
+    ;***************************************************************************
     movlw	b'00100000'
 		 ;--1-----	;Enable USART receive interrupt (RCIE=1)
     banksel	PIE1
@@ -538,6 +584,7 @@ start:
     
     banksel	PORTD
     clrf	PORTD
+    clrf	PORTC
     
     ;1/4 second delay
     movlw	.250
