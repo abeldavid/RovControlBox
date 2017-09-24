@@ -276,8 +276,8 @@ isrEnd
     retfie
 ;****************************Leak Indicator*************************************
 Leak
-    banksel	PORTD
-    bsf		PORTD, 1
+    banksel	PORTC
+    bsf		PORTC, 0
     movlw       .25              
     banksel	CCPR1L
     movwf       CCPR1L          ; -> PWM duty cycle = 18%
@@ -286,8 +286,8 @@ Leak
     
     ;***************************ESC ready light*********************************
 ESCready
-    banksel	PORTD
-    bsf		PORTD, 0
+    banksel	PORTC
+    bsf		PORTC, 1
     retlw	0
     
 delayMillis
@@ -449,9 +449,9 @@ start:
     movwf   (TRISA ^ BANK1)
     movlw   b'11111111'		    
     movwf   (TRISB ^ BANK1)
-    movlw   b'11111011'		;PORTC, 7 = RX pin for UART, PORTC, 2=P1A (PWM)         
+    movlw   b'11111000'		;PORTC, 7 = RX pin for UART, PORTC, 2=P1A (PWM)         
     movwf   (TRISC ^ BANK1)
-    movlw   b'11111100'		;Leak and ready lights
+    movlw   b'00000000'		;Leak and ready lights
     movwf   (TRISD ^ BANK1)	    
     movlw   b'00000000'
     movwf   (TRISE ^ BANK1)
@@ -796,7 +796,6 @@ traverseLeft
     goto	mainLoop
    
     END                       
-
 
 
 
