@@ -12,7 +12,7 @@
     #define BANK2  (h'100')
     #define BANK3  (h'180')
 
-    __CONFIG _CONFIG1,    _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF & _WDTE_OFF & _PWRTE_ON & _FOSC_XT & _FCMEN_OFF & _IESO_OFF
+    __CONFIG _CONFIG1,    _MCLRE_ON & _CP_OFF & _CPD_OFF & _BOREN_OFF & _WDTE_OFF & _PWRTE_ON & _FOSC_XT & _FCMEN_OFF & _IESO_OFF
 
 ;Context saving variables:
 CONTEXT	UDATA_SHR
@@ -456,6 +456,10 @@ start:
     movlw   b'00000000'
     movwf   (TRISE ^ BANK1)
     
+    banksel	PORTD
+    clrf	PORTD
+    clrf	PORTC
+    
     ;************************Configure timer************************************
     ;With 4Mhz external crystal, FOSC is not divided by 4.
     ;Therefore each instruction is 1/4 of a microsecond (250*10^-9 sec.)
@@ -582,9 +586,7 @@ start:
     clrf	ANSELD
     clrf	ANSELE
     
-    banksel	PORTD
-    clrf	PORTD
-    clrf	PORTC
+    
     
     ;1/4 second delay
     movlw	.250
@@ -597,6 +599,9 @@ start:
     
     movlw	.250
     movwf	motorTemp
+    banksel	receiveData
+    clrf	receiveData
+    clrf	transData
 
 mainLoop
     ;9th data bit = LSB of transmission:
