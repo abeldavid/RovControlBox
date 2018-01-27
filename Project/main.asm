@@ -18,6 +18,9 @@
     extern	getAn0Disp	;displacement from "dead-center" for AN0
     extern	getAn1Disp	;displacement from "dead-center" for AN1
     extern	getMotorSpeed	;routine to determine correct speed of motor
+    extern	checkSlop
+    extern	slopFlag
+    
     global	transData	;UART transmit variable
     global	receiveData	;UART receive variable
     global	state		;desired directional "state" of ROV
@@ -537,40 +540,13 @@ waitAdc2
     banksel	ADRESH
     movfw	ADRESH
     movwf	ADRESH1
-
-;Account for "slop" in fwd/rev and left/right potentiometers
-;check if greater than 160    
-checkFRslop
-    movlw	.160
-    subwf	ADRESH0, w
-    btfsc	STATUS, C	;(C=0 is neg #)
-    goto	Displacement	;value > 160 (go to rotation section)
-    ;not greater than 160, check if less than 100
-    movlw	.90
-    subwf	ADRESH0, w
-    btfss	STATUS, C	;(C=0 is neg #)
-    goto	Displacement	;value < 126 (go to rotation section)
-checkLRslop
-    movlw	.160
-    subwf	ADRESH1, w
-    btfsc	STATUS, C	;(C=0 is neg #)
-    goto	Displacement	;value > 128 (go to rotation section)
-    ;not greater than 128, check if less than 126
-    movlw	.90
-    subwf	ADRESH1, w
-    btfss	STATUS, C	;(C=0 is neg #)
-    goto	Displacement	;value < 126 (go to rotation section)
-    ;Stop all thrusters (neutral joystick position)
-    movlw	.7		;"stop" state
-    movwf	state
-    movlw	.95		;1500uS pulse width
-    banksel	forwardSpeed		
-    movwf	forwardSpeed
-    movwf	reverseSpeed
-    movwf	upDownSpeed
-    
+;Check for joystick slop
+    pagesel	checkSlop
+    call	checkSlop
+    pagesel$
+    banksel	slopFlag
+    btfsc	slopFlag, 0
     goto	mainLoop
-    
 Displacement
     ;Check whether AN0 or AN1 value is further away from 127
     
@@ -578,11 +554,12 @@ Displacement
     pagesel	getAn0Disp
     call	getAn0Disp
     pagesel$
+    
 ;2) Get AN1 displacement from 127     
     pagesel	getAn1Disp
     call	getAn1Disp
     pagesel$
-zeroVsOneCont
+
     ;subtract AN1disp from AN0disp to see which displacement is greater
     movfw	AN1disp
     subwf	AN0disp, w
