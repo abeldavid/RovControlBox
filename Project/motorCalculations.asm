@@ -125,7 +125,7 @@ checkLRslop
     retlw	0		;value < 126 (go to rotation section)
     ;Stop all thrusters (neutral joystick position)
     banksel	slopFlag
-    bsf		slopFlag, 0	;Set flag to indicate sloppy joystick
+    bsf		slopFlag, 0	;Set flag to indicate slop in joystick
     movlw	.7		;"stop" state
     movwf	state
     movlw	.95		;1500uS pulse width

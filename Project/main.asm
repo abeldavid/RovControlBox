@@ -546,7 +546,7 @@ waitAdc2
     pagesel$
     banksel	slopFlag
     btfsc	slopFlag, 0
-    goto	mainLoop
+    goto	mainLoop	;slop, o reloop
 Displacement
     ;Check whether AN0 or AN1 value is further away from 127
     
