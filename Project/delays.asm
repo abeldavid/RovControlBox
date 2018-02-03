@@ -9,11 +9,6 @@
     errorlevel -302	;no "register not in bank 0" warnings
     errorlevel -312     ;no  "page or bank selection not needed" messages
     errorlevel -207    ;no label after column one warning
-	
-    #define BANK0  (h'000')
-    #define BANK1  (h'080')
-    #define BANK2  (h'100')
-    #define BANK3  (h'180')
     
 MULTIBANK	UDATA_SHR
 userMillis	RES	1
