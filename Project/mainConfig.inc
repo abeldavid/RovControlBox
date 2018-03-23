@@ -13,6 +13,7 @@
     extern	checkSlop
     extern	slopFlag
     extern	peripheralInit
+    extern	displayHeaders
     
     global	transData	;UART transmit variable
     global	receiveData	;UART receive variable
