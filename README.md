@@ -17,4 +17,8 @@ and left/right for clockwise and counter clockwise rotation
 
 The data is transmitted in 8-bit data packets via the PIC16F1937 UART module.
 
+More detailed info can be found on the project's webpage: https://bitdrivencircuits.com/ROV/ROVhome.html .
+It can take a little bit of time for me to update the webpage with the latest changes and often times there is not
+a 1:1 relationship between the code posted here and the code presented on the website.
+
 
