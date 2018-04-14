@@ -6,7 +6,6 @@
     global	getAn1Disp
     global	getMotorSpeed
     global	checkSlop
-    global	slopFlag
     
     extern	ADRESH0
     extern	ADRESH1
@@ -21,22 +20,13 @@
     extern	forwardSpeed
     extern	reverseSpeed
     extern	upDownSpeed
-    
+    extern	slopFlag
 	
     errorlevel -302	;no "register not in bank 0" warnings
-    errorlevel -312     ;no  "page or bank selection not needed" messages
     errorlevel -207    ;no label after column one warning
-	
-    #define BANK0  (h'000')
-    #define BANK1  (h'080')
-    #define BANK2  (h'100')
-    #define BANK3  (h'180')
-    
-    GENVAR1	UDATA
-    slopFlag	RES	1
     
 ;******Get the displacement of AN0 analog input (distance from 127)*************
-.An0Displacement code
+.motor code
 getAn0Disp
     btfss	ADRESH0, 7	;test MSB of ADRESH0 (1: > 127, 0: <= 127
     goto	A0Lowerhalf	;ADRESH0 <= 127
@@ -54,7 +44,6 @@ A0Lowerhalf
     retlw	0
 
 ;*********Get the displacement of AN1 analog input (distance from 127)**********
-.An1Displacement code
 getAn1Disp
     btfss	ADRESH1, 7	;test MSB of ADRESH1 (1: > 127, 0: <= 127
     goto	A1Lowerhalf	;ADRESH1 <= 127
@@ -72,9 +61,9 @@ A1Lowerhalf
     retlw	0
     
 ;***************Get the speed of the thruster motor:****************************
-.getMotorSpeed code
 getMotorSpeed
     clrf	adcCounter
+    banksel	compCounter
     clrf	compCounter
     clrf	positionSpeed
     movlw	.70		;Start with speed value at max reverse
@@ -82,6 +71,7 @@ getMotorSpeed
 startAdding
     ;make sure adcCounter isn't < 5 away from 255
     movfw	adcCounter
+    banksel	motorTemp
     subwf	motorTemp, w		;value in temp is 250
     btfss	STATUS, C
     goto	motorEnd	;it is so exit routine
@@ -92,12 +82,12 @@ startAdding
     subwf	ADRESHc, w
     btfss	STATUS, C	;reached value of ADRESH yet? (C=0 is neg #)
     goto	motorEnd	;yes so exit routine
+    banksel	positionSpeed
     incf	positionSpeed, f	;no so increment motorSpeed by one
     goto	startAdding
 motorEnd
     retlw	0
 ;**************Account for "slop" in fwd/rev and lt/rt potentiometers***********   
-.checkSlop code
 checkSlop
     banksel	slopFlag
     clrf	slopFlag
@@ -125,8 +115,9 @@ checkLRslop
     retlw	0		;value < 126 (go to rotation section)
     ;Stop all thrusters (neutral joystick position)
     banksel	slopFlag
-    bsf		slopFlag, 0	;Set flag to indicate sloppy joystick
+    bsf		slopFlag, 0	;Set flag to indicate slop in joystick
     movlw	.7		;"stop" state
+    banksel	state
     movwf	state
     movlw	.95		;1500uS pulse width
     banksel	forwardSpeed		

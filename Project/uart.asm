@@ -14,16 +14,10 @@
     extern	delayMillis
 	
     errorlevel -302	;no "register not in bank 0" warnings
-    errorlevel -312     ;no  "page or bank selection not needed" messages
     errorlevel -207    ;no label after column one warning
-	
-    #define BANK0  (h'000')
-    #define BANK1  (h'080')
-    #define BANK2  (h'100')
-    #define BANK3  (h'180')
     
 ;********************Transmit UART data packets*********************************
-.transmit code
+.uart code
  Transmit
     banksel	transData
     movfw	transData	
@@ -39,7 +33,6 @@ wait_trans
     retlw	0
 
 ;*******************Receive UART data packets***********************************
-.receive code
  Receive
     banksel	PIR1
 wait_receive
@@ -58,14 +51,12 @@ wait_receive
     retlw	0
 
 ;**************Send thruster speed/direction data via UART**********************
-.sendThrust code
 ;Send thruster data
 sendThrust
+    banksel	state
     movfw	state
     movwf	transData
-    pagesel	Transmit
     call	Transmit
-    pagesel$
     movlw	.5
     pagesel	delayMillis
     call	delayMillis
@@ -74,9 +65,7 @@ sendThrust
     banksel	forwardSpeed
     movfw	forwardSpeed
     movwf	transData
-    pagesel	Transmit
     call	Transmit
-    pagesel$
     movlw	.5
     pagesel	delayMillis
     call	delayMillis
@@ -85,9 +74,7 @@ sendThrust
     banksel	reverseSpeed
     movfw	reverseSpeed
     movwf	transData
-    pagesel	Transmit
     call	Transmit
-    pagesel$
     movlw	.5
     pagesel	delayMillis
     call	delayMillis
@@ -97,9 +84,7 @@ sendThrust
     banksel	upDownSpeed
     movfw	upDownSpeed
     movwf	transData
-    pagesel	Transmit
     call	Transmit
-    pagesel$
     movlw	.50
     pagesel	delayMillis
     call	delayMillis
