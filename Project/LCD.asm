@@ -5,19 +5,17 @@
     #include	<p16f1937.inc>		; processor specific variable definitions
     
     errorlevel -302	;no "register not in bank 0" warnings
-    errorlevel -312     ;no  "page or bank selection not needed" messages
     errorlevel -207    ;no label after column one warning
     
     extern  delayMillis
+    extern  stringIndex1
+    extern  stringIndex2
     
     global  LCDInit
-    global  displayHeaders
     global  sendData
     global  sendCommand
-    global  ESCinitializing
+    global  displayHeaders
     
-GENVAR		UDATA_SHR
-	
 ;Set command mode
 .lcd code
 RS0
@@ -36,9 +34,6 @@ ePulse
     nop	
     nop					;hold for 3 clock cycles
     nop
-    nop
-    nop
-    nop
     bcf		PORTB, 1		;take E line low
     retlw	0
 	
@@ -49,7 +44,9 @@ sendCommand
     call	RS0	    ;Enter command mode
     call	ePulse	    ;pulse E line
     movlw	.2
+    pagesel	delayMillis
     call	delayMillis
+    pagesel$
     retlw	0
 	
 ;Send character data to LCD (data is already in work register)
@@ -59,14 +56,39 @@ sendData
     call	RS1	    ;Enter character mode
     call	ePulse	    ;pulse E line
     movlw	.2
+    pagesel	delayMillis
     call	delayMillis
+    pagesel$
     retlw	0	
+    
+getString1
+    movlw	    LOW string1
+    banksel	    stringIndex1
+    addwf	    stringIndex1, w
+    btfsc	    STATUS, C
+    incf	    PCLATH, f
+    movwf	    PCL
+string1	dt	    "Ensure control-box ", 0
+	
+getString2
+    movlw	    LOW string2
+    banksel	    stringIndex2
+    addwf	    stringIndex2, w
+    btfsc	    STATUS, C
+    incf	    PCLATH, f
+    movwf	    PCL
+string2	dt	    "turned on first !!", 0
 
 ;***************Initialize LCD**************************************************
 LCDInit
+    banksel	stringIndex1	    ;Clear out string index counter
+    clrf	stringIndex1
+    clrf	stringIndex2
 ;25ms startup delay
     movlw	.50
+    pagesel	delayMillis
     call	delayMillis
+    pagesel$
 
     movlw	b'00111000'	;user-defined "function set" command
     call	sendCommand
@@ -83,7 +105,45 @@ LCDInit
     ;Clear display and reset cursor
     movlw	b'00000001'
     call	sendCommand
-
+    call	ESCinitializing
+    
+    ;Display connection info message
+    ;Set display address to beginning of 3rd line
+    movlw	0x94
+    call	sendCommand
+    ;get next character from string:
+s1
+    call	getString1	;display first name
+    ;finish if null
+    iorlw	0
+    btfsc	STATUS, Z	;end of string?
+    goto	s2		;if end of string quit looping
+	;Write character to display:
+    call	sendData	;write char
+    movlw	.1
+    call	delayMillis	;delay
+    banksel	stringIndex1
+    incf	stringIndex1	;increment string index to point to next char
+    goto	s1
+s2
+    ;Set display address to beginning of 4th line
+    movlw	0xD4
+    call	sendCommand
+dispS2
+    call	getString2	;display first name
+    ;finish if null
+    iorlw	0
+    btfsc	STATUS, Z	;end of string?
+    goto	lcdDone  	;if end of string quit looping
+    ;Write character to display:
+    call	sendData	;write char
+    movlw	.1
+    call	delayMillis	;delay
+    banksel	stringIndex2
+    incf	stringIndex2	;increment string index to point to next char
+    goto	dispS2
+lcdDone
+    
     retlw	0   
 
 ;***************************Display data***************************************
@@ -91,8 +151,6 @@ displayHeaders
     ;Clear display and reset cursor
     movlw	b'00000001'
     call	sendCommand
-    movlw	.20
-    call	delayMillis
 pressure
     movlw	b'01010100'
     call	sendData
@@ -105,7 +163,7 @@ pressure
     movlw	b'00111010'
     call	sendData
 ;Set display address to beginning of second line
-    movlw	b'11000000'
+    movlw	0xC0
     call	sendCommand
 
 temp
@@ -123,6 +181,8 @@ temp
     call	sendData
 
     retlw	0
+   
+;Display "Initializing ESC"
 ESCinitializing
     movlw	b'01001001'	;I
     call	sendData
@@ -164,8 +224,6 @@ ESCinitializing
     call	sendData
     movlw	b'00101110'
     call	sendData
-    
-    
     
     retlw	0
     
