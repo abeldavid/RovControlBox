@@ -57,7 +57,7 @@ sendThrust
     movfw	state
     movwf	transData
     call	Transmit
-    movlw	.5
+    movlw	.10
     pagesel	delayMillis
     call	delayMillis
     pagesel$
@@ -66,7 +66,7 @@ sendThrust
     movfw	forwardSpeed
     movwf	transData
     call	Transmit
-    movlw	.5
+    movlw	.10
     pagesel	delayMillis
     call	delayMillis
     pagesel$
@@ -75,7 +75,7 @@ sendThrust
     movfw	reverseSpeed
     movwf	transData
     call	Transmit
-    movlw	.5
+    movlw	.10
     pagesel	delayMillis
     call	delayMillis
     pagesel$

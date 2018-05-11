@@ -236,24 +236,31 @@ Reception
     xorwf	receiveData, w
     btfss	STATUS, Z
     goto	testsubReady
-    goto	LeakDetected
-testsubReady
-    movlw	.2		;code for ready light upon ESC initialization
-    banksel	receiveData
-    xorwf	receiveData, w
-    btfss	STATUS, Z
-    retlw	0
-    pagesel	ESCready
-    call	ESCready
-    pagesel$
-    retlw	0
 LeakDetected
     banksel	PIE1
     bcf	        PIE1, RCIE	 ;disable UART receive interrupts
     pagesel	Leak
     call	Leak
     pagesel$
-    
     retlw	0
+testsubReady
+    movlw	.2		;code for ready light upon ESC initialization
+    banksel	receiveData
+    xorwf	receiveData, w
+    btfss	STATUS, Z
+    goto	sensor
+    pagesel	ESCready
+    call	ESCready
+    pagesel$
+    retlw	0
+sensor
+    movlw	.3		;code for sensor data
+    banksel	receiveData
+    xorwf	receiveData, w
+    btfss	STATUS, Z
+    retlw	0
+    movlw	.1		;dummy instruction for testing
+    retlw	0
+
 
     END
