@@ -1,4 +1,4 @@
-;Interrupt service routines
+;Interrupt service routines for control box
     list	p=16f1937	;list directive to define processor
     #include	<p16f1937.inc>		; processor specific variable definitions
     
@@ -30,6 +30,8 @@
     extern	receiveData
     extern	ESCready
     extern	Leak
+    extern	sensorState
+    extern	Temperature
     
     .intrpt code
 ;*******PortB interrupt on change for joystick push-button switch **************
@@ -230,37 +232,54 @@ Reception
     pagesel	Receive
     call	Receive
     pagesel$
+    ;Check sensor state to see if we are expecting a certain type of sensor data
+    movlw	.3
+    banksel	sensorState
+    xorwf	sensorState, w	    
+    btfsc	STATUS, Z	;Are we expecting Temperature reading from ROV?
+    goto	readTemp	;Yes so get the temperature reading
     ;determine sensor type
     banksel	receiveData
     movlw	.1		;code for leak
     xorwf	receiveData, w
-    btfss	STATUS, Z
-    goto	testsubReady
+    btfsc	STATUS, Z	
+    goto	LeakDetected	;Proceed to leak label
+    
+    movlw	.2		;code for ready light upon ESC initialization
+    banksel	receiveData
+    xorwf	receiveData, w
+    btfsc	STATUS, Z
+    goto	testsubReady	;Proceed to testsubReady (ESCs are initialized)
+    
+    movlw	.3		;code for temperature data
+    banksel	receiveData
+    xorwf	receiveData, w
+    btfsc	STATUS, Z
+    goto	temperature
+    
 LeakDetected
-    banksel	PIE1
-    bcf	        PIE1, RCIE	 ;disable UART receive interrupts
     pagesel	Leak
     call	Leak
     pagesel$
     retlw	0
 testsubReady
-    movlw	.2		;code for ready light upon ESC initialization
-    banksel	receiveData
-    xorwf	receiveData, w
-    btfss	STATUS, Z
-    goto	sensor
     pagesel	ESCready
     call	ESCready
     pagesel$
     retlw	0
-sensor
-    movlw	.3		;code for sensor data
+temperature
+    movlw	.3
+    banksel	sensorState
+    movwf	sensorState
+    retlw	0
+readTemp
     banksel	receiveData
-    xorwf	receiveData, w
-    btfss	STATUS, Z
+    movfw	receiveData
+    movwf	Temperature	;get Temperature reading
+    banksel	sensorState
+    clrf	sensorState	;clear out sensor state so we can receive other 
+				;data
+    
     retlw	0
-    movlw	.1		;dummy instruction for testing
-    retlw	0
-
 
     END

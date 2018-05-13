@@ -1,5 +1,5 @@
 ;Convert analog signal from joystick to PWM values to be sent to 6 thrusters
-;via UART
+;via UART (Main file for Control Box)
 
     list	p=16f1937	   ;list directive to define processor
     #include	<p16f1937.inc>	   ;processor specific variable definitions

@@ -41,6 +41,8 @@
     global	dly16Ctr
     global	stringIndex1
     global	stringIndex2
+    global	sensorState
+    global	Temperature
 
     #define BANK0  (h'000')
     #define BANK1  (h'080')
@@ -83,6 +85,9 @@
     state	    RES	1	;desired directional "state" of ROV
     stringIndex1    RES	1	;String for LCD
     stringIndex2    RES	1	;String for LCD
+    sensorState	    RES	1	;Used to indicate what type of data we will be receiving
+				;from below-surface sensors upon reception of next data packet
+    Temperature	    RES	1	;Temperature value (in Farenheit) received from ROV via UART
 
 
    
