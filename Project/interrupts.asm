@@ -32,6 +32,7 @@
     extern	Leak
     extern	sensorState
     extern	Temperature
+    extern	dispTemp
     
     .intrpt code
 ;*******PortB interrupt on change for joystick push-button switch **************
@@ -238,6 +239,8 @@ Reception
     xorwf	sensorState, w	    
     btfsc	STATUS, Z	;Are we expecting Temperature reading from ROV?
     goto	readTemp	;Yes so get the temperature reading
+    
+    ;Sensor state has not been set so check for other indicators/warnings
     ;determine sensor type
     banksel	receiveData
     movlw	.1		;code for leak
@@ -256,6 +259,7 @@ Reception
     xorwf	receiveData, w
     btfsc	STATUS, Z
     goto	temperature
+    retlw	0
     
 LeakDetected
     pagesel	Leak
@@ -276,6 +280,9 @@ readTemp
     banksel	receiveData
     movfw	receiveData
     movwf	Temperature	;get Temperature reading
+    pagesel	dispTemp
+    call	dispTemp	;Output temperature reading to LCD
+    pagesel$
     banksel	sensorState
     clrf	sensorState	;clear out sensor state so we can receive other 
 				;data

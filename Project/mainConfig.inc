@@ -43,6 +43,8 @@
     global	stringIndex2
     global	sensorState
     global	Temperature
+    global	getDigit
+    global	LCDdigit
 
     #define BANK0  (h'000')
     #define BANK1  (h'080')
@@ -88,6 +90,7 @@
     sensorState	    RES	1	;Used to indicate what type of data we will be receiving
 				;from below-surface sensors upon reception of next data packet
     Temperature	    RES	1	;Temperature value (in Farenheit) received from ROV via UART
+    LCDdigit	    RES	1	;Used for converting binary value to decimal value for LCD
 
 
    

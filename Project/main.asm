@@ -50,6 +50,19 @@ isrEnd
     swapf	w_copy,w
     retfie
    
+getDigit
+    addwf   PCL, f
+    retlw   b'00110000'	    ;0
+    retlw   b'00110001'	    ;1
+    retlw   b'00110010'	    ;2
+    retlw   b'00110011'	    ;3
+    retlw   b'00110100'	    ;4
+    retlw   b'00110101'	    ;5
+    retlw   b'00110110'	    ;6
+    retlw   b'00110111'	    ;7
+    retlw   b'00111000'	    ;8
+    retlw   b'00111001'	    ;9
+    
 .main    code	
 start:
     pagesel	peripheralInit

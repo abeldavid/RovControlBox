@@ -10,11 +10,15 @@
     extern  delayMillis
     extern  stringIndex1
     extern  stringIndex2
+    extern  Temperature
+    extern  getDigit
+    extern  LCDdigit
     
     global  LCDInit
     global  sendData
     global  sendCommand
     global  displayHeaders
+    global  dispTemp
     
 ;Set command mode
 .lcd code
@@ -147,37 +151,92 @@ lcdDone
     retlw	0   
 
 ;***************************Display data***************************************
+    ;Display Temp and Press Values
+dispTemp
+    ;Move to correct display address location
+    movlw	0x87
+    call	sendCommand
+    movlw	.100
+    banksel	Temperature
+    subwf	Temperature, w
+    btfss	STATUS, C	;C=0=neg number
+    goto	sub100		;Temperature is less than 3 digits
+    movlw	b'00110001'	;Temp>100 deg F, display "1"
+sub100
+    banksel	LCDdigit
+    clrf	LCDdigit
+tens
+    incf	LCDdigit, f
+    movlw	.10
+    subwf	Temperature, f
+    btfsc	STATUS, C	;C=0=neg number
+    goto	tens
+    decf	LCDdigit, f	;restore LCDdigit to pre-neg number value
+    movlw	.10
+    addwf	Temperature, f	;Restore Temperature to pre-neg number value
+    movfw	LCDdigit
+    pagesel	getDigit
+    call	getDigit	;and get the corresponding tens value for LCD
+    pagesel$
+    call	sendData	;Then output it to the LCD
+    clrf	LCDdigit	;Reset LCD digit to be output to LCD
+ones
+    incf	LCDdigit, f
+    movlw	.1
+    subwf	Temperature, f
+    btfsc	STATUS, C	;C=0=neg number
+    goto	ones
+    decf	LCDdigit, f	;restore LCDdigit to pre-neg number value
+    movfw	LCDdigit
+    pagesel	getDigit
+    call	getDigit	;and get the corresponding tens value for LCD
+    pagesel$
+    call	sendData	;Then output it to the LCD
+    
+    retlw	0
+    
+
+    
+    ;Display Temp and Press Headers
 displayHeaders
     ;Clear display and reset cursor
     movlw	b'00000001'
     call	sendCommand
-pressure
-    movlw	b'01010100'
+
+    movlw	b'01010100'	;"T"
     call	sendData
-    movlw	b'01100101'
+    movlw	b'01100101'	;"e"
     call	sendData
-    movlw	b'01101101'
+    movlw	b'01101101'	;"m"
     call	sendData
-    movlw	b'01110000'
+    movlw	b'01110000'	;"p"
     call	sendData
-    movlw	b'00111010'
+    movlw	b'00111010'	;":"
     call	sendData
+    ;Move over a few spaces and display deg F notation:
+    movlw	0x89
+    call	sendCommand
+    movlw	b'11011111'	;"degree symbol"
+    call	sendData
+    movlw	b'01000110'	;"F"
+    call	sendData
+    
 ;Set display address to beginning of second line
     movlw	0xC0
     call	sendCommand
 
-temp
-    movlw	b'01010000'
+
+    movlw	b'01010000'	;"P"
     call	sendData
-    movlw	b'01110010'
+    movlw	b'01110010'	;"r"
     call	sendData
-    movlw	b'01100101'
+    movlw	b'01100101'	;"e"
     call	sendData
-    movlw	b'01110011'
+    movlw	b'01110011'	;"s"
     call	sendData
-    movlw	b'01110011'
+    movlw	b'01110011'	;"s"
     call	sendData
-    movlw	b'00111010'
+    movlw	b'00111010'	;":"
     call	sendData
 
     retlw	0
