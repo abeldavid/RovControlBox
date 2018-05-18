@@ -161,7 +161,8 @@ dispTemp
     subwf	Temperature, w
     btfss	STATUS, C	;C=0=neg number
     goto	sub100		;Temperature is less than 3 digits
-    movlw	b'00110001'	;Temp>100 deg F, display "1"
+    movlw	b'00110001'	
+    call	sendData	;Temp>100 deg F, display "1"
 sub100
     banksel	LCDdigit
     clrf	LCDdigit
@@ -179,6 +180,7 @@ tens
     call	getDigit	;and get the corresponding tens value for LCD
     pagesel$
     call	sendData	;Then output it to the LCD
+    banksel	LCDdigit
     clrf	LCDdigit	;Reset LCD digit to be output to LCD
 ones
     incf	LCDdigit, f

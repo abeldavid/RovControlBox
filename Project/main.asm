@@ -37,7 +37,7 @@ UartReceive
     call	Reception
     pagesel$
     goto	isrEnd
-
+;Restore interrupt context-saving variables
 isrEnd	
     banksel	PIE1
     bsf	        PIE1, RCIE	 ;enable UART receive interrupts
@@ -49,7 +49,8 @@ isrEnd
     swapf	w_copy,f
     swapf	w_copy,w
     retfie
-   
+    
+;Lookup table to retrieve digit for LCD display   
 getDigit
     addwf   PCL, f
     retlw   b'00110000'	    ;0
@@ -69,17 +70,13 @@ start:
     call	peripheralInit	    ;initialize peripherals
     pagesel$
 ;Wait until we receive a signal saying ESCs are initialized before proceeding
-    bcf		INTCON, IOCIE	;Temporarily disable IOC for PORTB so 
     banksel	PORTC		;joystick PB-switch doesn't trigger interrupt
 waitESC
     btfss	PORTC, 1
     goto	waitESC
-    bsf		INTCON, IOCIE	;Reenable IOC for PORTB
+    bsf		INTCON, IOCIE	;Ennable IOC for PORTB Now that ESCs are initialized
     
 mainLoop
-    ;9th data bit = LSB of transmission:
-    ;banksel	TXSTA
-    ;bcf	TXSTA, TX9D
     ;Send Thruster data 
     pagesel	sendThrust
     call	sendThrust

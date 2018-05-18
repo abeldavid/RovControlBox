@@ -203,7 +203,6 @@ depth
     movfw	positionSpeed
     movwf	upDownSpeed
     
-;restore pre-ISR values to registers
 endMotors
     pagesel	sendThrust
     call	sendThrust
