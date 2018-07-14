@@ -129,11 +129,11 @@ peripheralInit
     
     ;*********************************CONFIGURE UART********************************
     ;Configure Baud rate
-    movlw	b'01000000' 
+    movlw	b'00111010' ;=58
     banksel	SPBRG
     movwf	SPBRG	    
     
-    movlw	b'00000011'
+    movlw	b'00000011' ;=3 Total value of SPBRG/n = 826
     banksel	SPBRGH
     movwf	SPBRGH
     
