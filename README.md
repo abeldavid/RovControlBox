@@ -1,3 +1,8 @@
+******************************NOTICE!! This project is currently being migrated over to gitlab******************************
+                                          and can be found at:
+                                  https://gitlab.com/electroBin/ROV                                                                I will continue to update the project in both repositories for the time being until I feel sure that everything is working well with gitlab.  I will eventually give advanced notice of when the project will be removed from github.
+
+
 This program is one of two designed to control an underwater ROV.  Specifically, this program is written for
 a "control box" device which contains an analog joystick and is used to alter the direction and depth of 
 the under-water ROV.  The microcontroller used is a PIC16F1937.
